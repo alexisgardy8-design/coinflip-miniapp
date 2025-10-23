@@ -3,9 +3,18 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { Wallet } from "@coinbase/onchainkit/wallet";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
-import { Transaction } from "@coinbase/onchainkit/transaction";
+import { 
+  Transaction,
+  TransactionButton,
+  TransactionSponsor,
+  TransactionStatus,
+  TransactionStatusLabel,
+  TransactionStatusAction,
+} from "@coinbase/onchainkit/transaction";
+import type { LifecycleStatus } from "@coinbase/onchainkit/transaction";
 import styles from "./page.module.css";
-import { Abi } from 'viem'; // ← Import important
+import type { Abi } from 'viem';
+import { parseEther } from 'viem';
 
 import counterAbi from './counter-abi.json';
 
@@ -14,7 +23,7 @@ export default function Home() {
   const [betAmount, setBetAmount] = useState('0.001');
   const [choice, setChoice] = useState(true);
   
-  const COINFLIP_ADDRESS = "0x3bBBef8659b808765a6A66118D60c2732471E3D7";
+  const COINFLIP_ADDRESS = "0x3bBBef8659b808765a6A66118D60c2732471E3D7" as `0x${string}`;
 
   useEffect(() => {
     if (!isMiniAppReady) {
@@ -22,13 +31,19 @@ export default function Home() {
     }
   }, [setMiniAppReady, isMiniAppReady]);
 
-  const getValue = () => {
-    try {
-      return BigInt(Math.floor(parseFloat(betAmount || '0') * 1e18));
-    } catch {
-      return BigInt(0);
-    }
+  const handleOnStatus = (status: LifecycleStatus) => {
+    console.log('Transaction status:', status);
   };
+
+  const calls = [
+    {
+      address: COINFLIP_ADDRESS,
+      abi: counterAbi.abi as Abi,
+      functionName: 'flipCoin',
+      args: [choice],
+      value: parseEther(betAmount || '0'),
+    }
+  ];
 
   return (
     <div className={styles.container}>
@@ -106,30 +121,18 @@ export default function Home() {
 
           {/* PARTIE CORRIGÉE */}
           <Transaction
-            calls={[{
-              address: COINFLIP_ADDRESS,
-              abi: (counterAbi as unknown) as Abi, // ← Utilisation du type Abi de viem
-              functionName: 'flipCoin',
-              args: [choice],
-              value: getValue(),
-            }]}
-            onSuccess={() => alert('🎲 Flip lancé avec succès !')}
-            onError={(error) => alert('❌ Erreur: ' + error.message)}
+            calls={calls}
+            onStatus={handleOnStatus}
           >
-            <button 
-              style={{ 
-                width: '100%',
-                padding: '12px',
-                backgroundColor: '#0070f3',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '16px',
-                cursor: 'pointer'
-              }}
-            >
-              🎲 Lancer le Flip!
-            </button>
+            <TransactionButton 
+              className={styles.transactionButton}
+              text="🎲 Lancer le Flip!"
+            />
+            <TransactionSponsor />
+            <TransactionStatus>
+              <TransactionStatusLabel />
+              <TransactionStatusAction />
+            </TransactionStatus>
           </Transaction>
         </div>
       </div>

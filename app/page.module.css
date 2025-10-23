@@ -37,3 +37,24 @@
 .components a:hover {
   text-decoration: underline;
 }
+
+.transactionButton {
+  width: 100%;
+  padding: 12px;
+  background-color: #0070f3;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.transactionButton:hover {
+  background-color: #0060df;
+}
+
+.transactionButton:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
