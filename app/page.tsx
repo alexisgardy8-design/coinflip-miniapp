@@ -13,7 +13,7 @@ import {
 } from "@coinbase/onchainkit/transaction";
 import type { LifecycleStatus } from "@coinbase/onchainkit/transaction";
 import styles from "./page.module.css";
-import type { Abi, ContractFunctionParameters } from 'viem';
+import type { Abi } from 'viem';
 import { parseEther } from 'viem';
 
 import counterAbi from './counter-abi.json';
