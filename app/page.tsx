@@ -23,7 +23,7 @@ export default function Home() {
   const [betAmount, setBetAmount] = useState('0.001');
   const [choice, setChoice] = useState(true);
   
-  const COINFLIP_ADDRESS = "0x5428f0b9a173ea763dc16d66c1f345d558c18f12" as `0x${string}`;
+  const COINFLIP_ADDRESS = "0xf8bb05ab1abb47db42d1e77dea609fe2ac2fb828" as `0x${string}`;
 
   useEffect(() => {
     if (!isMiniAppReady) {
