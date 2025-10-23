@@ -14,7 +14,7 @@ import {
 import type { LifecycleStatus } from "@coinbase/onchainkit/transaction";
 import styles from "./page.module.css";
 import type { Abi, Hex, Log } from 'viem';
-import { parseEther, encodeFunctionData, createPublicClient, http } from 'viem';
+import { parseEther, encodeFunctionData, createPublicClient, http, decodeEventLog } from 'viem';
 import { baseSepolia } from 'viem/chains';
 
 import counterAbi from './counter-abi.json';
@@ -32,7 +32,7 @@ export default function Home() {
   const [flipResult, setFlipResult] = useState<{ won: boolean; winAmount: number } | null>(null);
   const [isWaitingForVRF, setIsWaitingForVRF] = useState(false);
   
-  const COINFLIP_ADDRESS = "0xc0c7fa70Ed28fbb3AcF07a5BBc8c2A297F0e8292" as `0x${string}`;
+  const COINFLIP_ADDRESS = "0xc9ec72188b243e26030d04d0ff6ff67efaf93e65" as `0x${string}`;
 
   useEffect(() => {
     if (!isMiniAppReady) {
@@ -51,6 +51,30 @@ export default function Home() {
       setFlipResult(null);
       setIsWaitingForVRF(true);
       
+      // Extraire le requestId à partir des logs de la transaction (événement CoinFlipRequested)
+      let matchedRequestId: bigint | null = null;
+      try {
+        const logs = receipt.logs as Array<{ address: string; data: `0x${string}`; topics: `0x${string}`[] }>;
+        for (const log of logs) {
+          if (log.address.toLowerCase() !== COINFLIP_ADDRESS.toLowerCase()) continue;
+          try {
+            const topicsTyped = log.topics as unknown as [`0x${string}`, ...`0x${string}`[]];
+            const decoded = decodeEventLog({
+              abi: counterAbi.abi as Abi,
+              data: log.data,
+              topics: topicsTyped,
+            });
+            if (decoded.eventName === 'CoinFlipRequested') {
+              const args = decoded.args as unknown as { requestId: bigint; player: string };
+              matchedRequestId = args.requestId;
+              break;
+            }
+          } catch {}
+        }
+      } catch (e) {
+        console.warn('Could not decode requestId from receipt logs', e);
+      }
+      
       // Écouter l'événement CoinFlipResult en temps réel
       const watchForResult = async () => {
         console.log('Watching for VRF callback...');
@@ -60,6 +84,8 @@ export default function Home() {
           address: COINFLIP_ADDRESS,
           abi: counterAbi.abi as Abi,
           eventName: 'CoinFlipResult',
+          // si on a le requestId, filtrer dessus pour réduire la latence et éviter les collisions
+          args: matchedRequestId ? { requestId: matchedRequestId } : undefined,
           onLogs: (logs) => {
             console.log('CoinFlipResult event received:', logs);
             
@@ -68,6 +94,7 @@ export default function Home() {
               type CoinFlipResultLog = Log & {
                 args: {
                   requestId: bigint;
+                  player: string;
                   didWin: boolean;
                   randomValue: bigint;
                 };

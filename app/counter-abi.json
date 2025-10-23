@@ -408,6 +408,12 @@
           "internalType": "uint256"
         },
         {
+          "name": "player",
+          "type": "address",
+          "indexed": false,
+          "internalType": "address"
+        },
+        {
           "name": "didWin",
           "type": "bool",
           "indexed": false,
