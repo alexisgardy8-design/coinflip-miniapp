@@ -29,10 +29,10 @@ export default function Home() {
   const { setMiniAppReady, isMiniAppReady } = useMiniKit();
   const [betAmount, setBetAmount] = useState('0.001');
   const [choice, setChoice] = useState(true);
-  const [flipResult, setFlipResult] = useState<{ won: boolean; message: string } | null>(null);
+  const [flipResult, setFlipResult] = useState<{ won: boolean; winAmount: number } | null>(null);
   const [isWaitingForVRF, setIsWaitingForVRF] = useState(false);
   
-  const COINFLIP_ADDRESS = "0xf8bb05ab1abb47db42d1e77dea609fe2ac2fb828" as `0x${string}`;
+  const COINFLIP_ADDRESS = "0xc0c7fa70Ed28fbb3AcF07a5BBc8c2A297F0e8292" as `0x${string}`;
 
   useEffect(() => {
     if (!isMiniAppReady) {
@@ -84,9 +84,7 @@ export default function Home() {
               setIsWaitingForVRF(false);
               setFlipResult({
                 won: didWin,
-                message: didWin 
-                  ? `🎉 Gagné! Vous avez reçu ${parseFloat(betAmount) * 2} ETH!` 
-                  : `😢 Perdu! Meilleure chance la prochaine fois.`,
+                winAmount: parseFloat(betAmount) * 2,
               });
               
               console.log('VRF Result:', didWin ? 'WON' : 'LOST');
@@ -103,7 +101,7 @@ export default function Home() {
             setIsWaitingForVRF(false);
             setFlipResult({
               won: false,
-              message: '⏱️ Délai d\'attente dépassé. Vérifiez votre wallet pour le résultat.',
+              winAmount: 0,
             });
           }
         }, 120000);
@@ -115,9 +113,26 @@ export default function Home() {
 
   // Recalculer les calls à chaque changement de betAmount ou choice
   const calls = useMemo(() => {
+    // Si on a un résultat et qu'on a gagné, préparer un appel à claimWinnings
+    if (flipResult && flipResult.won) {
+      const claimData: Hex = encodeFunctionData({
+        abi: counterAbi.abi as Abi,
+        functionName: 'claimWinnings',
+        args: [],
+      });
+      
+      return [
+        {
+          to: COINFLIP_ADDRESS,
+          data: claimData,
+          value: BigInt(0),
+        }
+      ];
+    }
+    
+    // Sinon, préparer un appel à flipCoin
     const ethValue = parseEther(betAmount || '0');
     
-    // Encoder les données de la fonction
     const callData: Hex = encodeFunctionData({
       abi: counterAbi.abi as Abi,
       functionName: 'flipCoin',
@@ -136,7 +151,7 @@ export default function Home() {
         value: ethValue,
       }
     ];
-  }, [betAmount, choice]);
+  }, [betAmount, choice, flipResult]);
 
   return (
     <div className={styles.container}>
@@ -213,20 +228,71 @@ export default function Home() {
           </div>
 
           {/* Transaction */}
-          <Transaction
-            calls={calls}
-            onStatus={handleOnStatus}
-          >
-            <TransactionButton 
-              className={styles.transactionButton}
-              text="🎲 Lancer le Flip!"
-            />
-            <TransactionSponsor />
-            <TransactionStatus>
-              <TransactionStatusLabel />
-              <TransactionStatusAction />
-            </TransactionStatus>
-          </Transaction>
+          {!flipResult ? (
+            <Transaction
+              calls={calls}
+              onStatus={handleOnStatus}
+            >
+              <TransactionButton 
+                className={styles.transactionButton}
+                text="🎲 Lancer le Flip!"
+              />
+              <TransactionSponsor />
+              <TransactionStatus>
+                <TransactionStatusLabel />
+                <TransactionStatusAction />
+              </TransactionStatus>
+            </Transaction>
+          ) : flipResult.won ? (
+            <Transaction
+              calls={calls}
+              onStatus={(status) => {
+                console.log('Claim status:', status);
+                if (status.statusName === 'success') {
+                  // Réinitialiser après réclamation
+                  setFlipResult(null);
+                }
+              }}
+            >
+              <TransactionButton 
+                className={styles.transactionButton}
+                text={`💰 Claim ${flipResult.winAmount} ETH`}
+              />
+              <TransactionSponsor />
+              <TransactionStatus>
+                <TransactionStatusLabel />
+                <TransactionStatusAction />
+              </TransactionStatus>
+            </Transaction>
+          ) : (
+            <div style={{
+              padding: '15px',
+              backgroundColor: '#f8d7da',
+              border: '1px solid #dc3545',
+              borderRadius: '8px',
+              textAlign: 'center',
+              fontWeight: 'bold',
+              color: '#721c24',
+            }}>
+              😢 You Lost! Better luck next time.
+              <button
+                onClick={() => setFlipResult(null)}
+                style={{
+                  marginTop: '10px',
+                  display: 'block',
+                  width: '100%',
+                  padding: '10px',
+                  backgroundColor: '#0070f3',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                }}
+              >
+                🎲 Try Again
+              </button>
+            </div>
+          )}
 
           {/* Statut VRF */}
           {isWaitingForVRF && (
@@ -242,21 +308,6 @@ export default function Home() {
               <div style={{ fontSize: '12px', marginTop: '5px', color: '#856404' }}>
                 Cela peut prendre 30-60 secondes
               </div>
-            </div>
-          )}
-
-          {/* Résultat */}
-          {flipResult && (
-            <div style={{
-              marginTop: '20px',
-              padding: '15px',
-              backgroundColor: flipResult.won ? '#d4edda' : '#f8d7da',
-              border: `1px solid ${flipResult.won ? '#28a745' : '#dc3545'}`,
-              borderRadius: '8px',
-              textAlign: 'center',
-              fontWeight: 'bold',
-            }}>
-              {flipResult.message}
             </div>
           )}
         </div>
