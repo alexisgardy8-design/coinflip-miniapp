@@ -5,8 +5,9 @@ import { Wallet } from "@coinbase/onchainkit/wallet";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
 import { Transaction } from "@coinbase/onchainkit/transaction";
 import styles from "./page.module.css";
+import { Abi } from 'viem'; // ← Import important
 
-const counterAbi = require('./counter-abi.json');
+import counterAbi from './counter-abi.json';
 
 export default function Home() {
   const { setMiniAppReady, isMiniAppReady } = useMiniKit();
@@ -107,7 +108,7 @@ export default function Home() {
           <Transaction
             calls={[{
               address: COINFLIP_ADDRESS,
-              abi: counterAbi,
+              abi: counterAbi as Abi, // ← Utilisation du type Abi de viem
               functionName: 'flipCoin',
               args: [choice],
               value: getValue(),
