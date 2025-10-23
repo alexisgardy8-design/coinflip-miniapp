@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Image from "next/image";
 import { Wallet } from "@coinbase/onchainkit/wallet";
 import { useMiniKit } from "@coinbase/onchainkit/minikit";
@@ -35,23 +35,30 @@ export default function Home() {
     console.log('Transaction status:', status);
   };
 
-  // Préparer les calls avec encodage manuel de la fonction
-  const ethValue = parseEther(betAmount || '0');
-  
-  // Encoder les données de la fonction
-  const callData: Hex = encodeFunctionData({
-    abi: counterAbi.abi as Abi,
-    functionName: 'flipCoin',
-    args: [choice],
-  });
-  
-  const calls = [
-    {
-      to: COINFLIP_ADDRESS,
-      data: callData,
-      value: ethValue,
-    }
-  ];
+  // Recalculer les calls à chaque changement de betAmount ou choice
+  const calls = useMemo(() => {
+    const ethValue = parseEther(betAmount || '0');
+    
+    // Encoder les données de la fonction
+    const callData: Hex = encodeFunctionData({
+      abi: counterAbi.abi as Abi,
+      functionName: 'flipCoin',
+      args: [choice],
+    });
+    
+    console.log('Creating transaction with:');
+    console.log('Bet amount:', betAmount, 'ETH');
+    console.log('Value in wei:', ethValue.toString());
+    console.log('Choice:', choice ? 'Pile' : 'Face');
+    
+    return [
+      {
+        to: COINFLIP_ADDRESS,
+        data: callData,
+        value: ethValue,
+      }
+    ];
+  }, [betAmount, choice]);
 
   return (
     <div className={styles.container}>
