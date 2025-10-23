@@ -14,7 +14,7 @@ import {
 import type { LifecycleStatus } from "@coinbase/onchainkit/transaction";
 import styles from "./page.module.css";
 import type { Abi } from 'viem';
-import { parseEther } from 'viem';
+import { parseEther, encodeFunctionData } from 'viem';
 
 import counterAbi from './counter-abi.json';
 
@@ -40,12 +40,17 @@ export default function Home() {
   console.log('Bet amount:', betAmount);
   console.log('Parsed value (wei):', ethValue.toString());
 
+  // Encoder les données de la fonction
+  const data = encodeFunctionData({
+    abi: counterAbi.abi as Abi,
+    functionName: 'flipCoin',
+    args: [choice],
+  });
+
   const calls = [
     {
-      address: COINFLIP_ADDRESS,
-      abi: counterAbi.abi as Abi,
-      functionName: 'flipCoin',
-      args: [choice],
+      to: COINFLIP_ADDRESS,
+      data: data,
       value: ethValue,
     }
   ];
