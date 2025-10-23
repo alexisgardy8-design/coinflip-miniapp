@@ -14,14 +14,23 @@ import {
 import type { LifecycleStatus } from "@coinbase/onchainkit/transaction";
 import styles from "./page.module.css";
 import type { Abi, Hex } from 'viem';
-import { parseEther, encodeFunctionData } from 'viem';
+import { parseEther, encodeFunctionData, createPublicClient, http } from 'viem';
+import { baseSepolia } from 'viem/chains';
 
 import counterAbi from './counter-abi.json';
+
+// Client public pour lire les événements
+const publicClient = createPublicClient({
+  chain: baseSepolia,
+  transport: http(),
+});
 
 export default function Home() {
   const { setMiniAppReady, isMiniAppReady } = useMiniKit();
   const [betAmount, setBetAmount] = useState('0.001');
   const [choice, setChoice] = useState(true);
+  const [flipResult, setFlipResult] = useState<{ won: boolean; message: string } | null>(null);
+  const [isWaitingForVRF, setIsWaitingForVRF] = useState(false);
   
   const COINFLIP_ADDRESS = "0xf8bb05ab1abb47db42d1e77dea609fe2ac2fb828" as `0x${string}`;
 
@@ -33,6 +42,75 @@ export default function Home() {
 
   const handleOnStatus = (status: LifecycleStatus) => {
     console.log('Transaction status:', status);
+    
+    if (status.statusName === 'success' && status.statusData?.transactionReceipts?.[0]) {
+      const receipt = status.statusData.transactionReceipts[0];
+      console.log('Transaction successful:', receipt.transactionHash);
+      
+      // Réinitialiser l'état précédent
+      setFlipResult(null);
+      setIsWaitingForVRF(true);
+      
+      // Écouter l'événement CoinFlipResult
+      const watchForResult = async () => {
+        console.log('Waiting for VRF callback...');
+        
+        // Récupérer le numéro de bloc de la transaction
+        const fromBlock = receipt.blockNumber;
+        
+        // Polling pour détecter l'événement CoinFlipResult
+        const checkInterval = setInterval(async () => {
+          try {
+            const logs = await publicClient.getLogs({
+              address: COINFLIP_ADDRESS,
+              event: {
+                type: 'event',
+                name: 'CoinFlipResult',
+                inputs: [
+                  { type: 'uint256', name: 'requestId', indexed: false },
+                  { type: 'bool', name: 'didWin', indexed: false },
+                  { type: 'uint256', name: 'randomValue', indexed: false },
+                ],
+              },
+              fromBlock: fromBlock,
+              toBlock: 'latest',
+            });
+            
+            if (logs.length > 0) {
+              clearInterval(checkInterval);
+              const log = logs[0];
+              const { didWin } = log.args as { didWin: boolean };
+              
+              setIsWaitingForVRF(false);
+              setFlipResult({
+                won: didWin,
+                message: didWin 
+                  ? `🎉 Gagné! Vous avez reçu ${parseFloat(betAmount) * 2} ETH!` 
+                  : `😢 Perdu! Meilleure chance la prochaine fois.`,
+              });
+              
+              console.log('VRF Result:', didWin ? 'WON' : 'LOST');
+            }
+          } catch (error) {
+            console.error('Error checking for VRF result:', error);
+          }
+        }, 3000); // Vérifier toutes les 3 secondes
+        
+        // Arrêter après 2 minutes
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          if (isWaitingForVRF) {
+            setIsWaitingForVRF(false);
+            setFlipResult({
+              won: false,
+              message: '⏱️ Délai d\'attente dépassé. Vérifiez votre wallet pour le résultat.',
+            });
+          }
+        }, 120000);
+      };
+      
+      watchForResult();
+    }
   };
 
   // Recalculer les calls à chaque changement de betAmount ou choice
@@ -134,7 +212,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* PARTIE CORRIGÉE */}
+          {/* Transaction */}
           <Transaction
             calls={calls}
             onStatus={handleOnStatus}
@@ -149,6 +227,38 @@ export default function Home() {
               <TransactionStatusAction />
             </TransactionStatus>
           </Transaction>
+
+          {/* Statut VRF */}
+          {isWaitingForVRF && (
+            <div style={{
+              marginTop: '20px',
+              padding: '15px',
+              backgroundColor: '#fff3cd',
+              border: '1px solid #ffc107',
+              borderRadius: '8px',
+              textAlign: 'center',
+            }}>
+              <div>⏳ En attente du tirage VRF...</div>
+              <div style={{ fontSize: '12px', marginTop: '5px', color: '#856404' }}>
+                Cela peut prendre 30-60 secondes
+              </div>
+            </div>
+          )}
+
+          {/* Résultat */}
+          {flipResult && (
+            <div style={{
+              marginTop: '20px',
+              padding: '15px',
+              backgroundColor: flipResult.won ? '#d4edda' : '#f8d7da',
+              border: `1px solid ${flipResult.won ? '#28a745' : '#dc3545'}`,
+              borderRadius: '8px',
+              textAlign: 'center',
+              fontWeight: 'bold',
+            }}>
+              {flipResult.message}
+            </div>
+          )}
         </div>
       </div>
     </div>
