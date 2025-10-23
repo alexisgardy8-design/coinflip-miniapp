@@ -108,7 +108,7 @@ export default function Home() {
           <Transaction
             calls={[{
               address: COINFLIP_ADDRESS,
-              abi: counterAbi as Abi, // ← Utilisation du type Abi de viem
+              abi: (counterAbi as unknown) as Abi, // ← Utilisation du type Abi de viem
               functionName: 'flipCoin',
               args: [choice],
               value: getValue(),
