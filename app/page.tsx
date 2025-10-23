@@ -13,7 +13,7 @@ import {
 } from "@coinbase/onchainkit/transaction";
 import type { LifecycleStatus } from "@coinbase/onchainkit/transaction";
 import styles from "./page.module.css";
-import type { Abi } from 'viem';
+import type { Abi, ContractFunctionParameters } from 'viem';
 import { parseEther } from 'viem';
 
 import counterAbi from './counter-abi.json';
@@ -35,13 +35,18 @@ export default function Home() {
     console.log('Transaction status:', status);
   };
 
+  // Debug log
+  const ethValue = parseEther(betAmount || '0');
+  console.log('Bet amount:', betAmount);
+  console.log('Parsed value (wei):', ethValue.toString());
+
   const calls = [
     {
       address: COINFLIP_ADDRESS,
       abi: counterAbi.abi as Abi,
       functionName: 'flipCoin',
       args: [choice],
-      value: parseEther(betAmount || '0'),
+      value: ethValue,
     }
   ];
 
