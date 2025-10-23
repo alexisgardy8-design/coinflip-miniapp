@@ -13,7 +13,7 @@ import {
 } from "@coinbase/onchainkit/transaction";
 import type { LifecycleStatus } from "@coinbase/onchainkit/transaction";
 import styles from "./page.module.css";
-import type { Abi, Hex } from 'viem';
+import type { Abi, Hex, Log } from 'viem';
 import { parseEther, encodeFunctionData, createPublicClient, http } from 'viem';
 import { baseSepolia } from 'viem/chains';
 
@@ -51,35 +51,29 @@ export default function Home() {
       setFlipResult(null);
       setIsWaitingForVRF(true);
       
-      // Écouter l'événement CoinFlipResult
+      // Écouter l'événement CoinFlipResult en temps réel
       const watchForResult = async () => {
-        console.log('Waiting for VRF callback...');
+        console.log('Watching for VRF callback...');
         
-        // Récupérer le numéro de bloc de la transaction
-        const fromBlock = receipt.blockNumber;
-        
-        // Polling pour détecter l'événement CoinFlipResult
-        const checkInterval = setInterval(async () => {
-          try {
-            const logs = await publicClient.getLogs({
-              address: COINFLIP_ADDRESS,
-              event: {
-                type: 'event',
-                name: 'CoinFlipResult',
-                inputs: [
-                  { type: 'uint256', name: 'requestId', indexed: false },
-                  { type: 'bool', name: 'didWin', indexed: false },
-                  { type: 'uint256', name: 'randomValue', indexed: false },
-                ],
-              },
-              fromBlock: fromBlock,
-              toBlock: 'latest',
-            });
+        // Utiliser watchContractEvent pour écouter en temps réel
+        const unwatch = publicClient.watchContractEvent({
+          address: COINFLIP_ADDRESS,
+          abi: counterAbi.abi as Abi,
+          eventName: 'CoinFlipResult',
+          onLogs: (logs) => {
+            console.log('CoinFlipResult event received:', logs);
             
             if (logs.length > 0) {
-              clearInterval(checkInterval);
-              const log = logs[0];
-              const { didWin } = log.args as { didWin: boolean };
+              // Typage explicite pour les logs d'événements
+              type CoinFlipResultLog = Log & {
+                args: {
+                  requestId: bigint;
+                  didWin: boolean;
+                  randomValue: bigint;
+                };
+              };
+              
+              const didWin = (logs[0] as CoinFlipResultLog).args.didWin;
               
               setIsWaitingForVRF(false);
               setFlipResult({
@@ -88,15 +82,16 @@ export default function Home() {
               });
               
               console.log('VRF Result:', didWin ? 'WON' : 'LOST');
+              unwatch(); // Arrêter l'écoute
             }
-          } catch (error) {
-            console.error('Error checking for VRF result:', error);
-          }
-        }, 3000); // Vérifier toutes les 3 secondes
+          },
+          pollingInterval: 1000, // Vérifier chaque seconde
+        });
         
-        // Arrêter après 2 minutes
+        // Timeout de sécurité après 3 minutes
         setTimeout(() => {
-          clearInterval(checkInterval);
+          console.log('Timeout reached, stopping watch');
+          unwatch();
           if (isWaitingForVRF) {
             setIsWaitingForVRF(false);
             setFlipResult({
@@ -104,7 +99,7 @@ export default function Home() {
               winAmount: 0,
             });
           }
-        }, 120000);
+        }, 180000);
       };
       
       watchForResult();
