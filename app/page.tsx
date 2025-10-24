@@ -114,10 +114,58 @@ export default function Home() {
           },
           pollingInterval: 1000, // Vérifier chaque seconde
         });
+
+        // Fallback: si aucun event reçu dans un délai raisonnable, aller lire les logs on-chain
+        const fallbackTimer = setTimeout(async () => {
+          try {
+            if (!isWaitingForVRF) return; // déjà résolu
+            console.log('Fallback getLogs triggered...');
+            const baseFilter: {
+              address: `0x${string}`;
+              abi: Abi;
+              eventName: 'CoinFlipResult';
+              fromBlock: bigint;
+              toBlock: 'latest';
+            } = {
+              address: COINFLIP_ADDRESS,
+              abi: counterAbi.abi as Abi,
+              eventName: 'CoinFlipResult',
+              // on part du bloc de la tx pour éviter de rater l'event
+              fromBlock: receipt.blockNumber as bigint,
+              toBlock: 'latest',
+            };
+            // Construire le paramètre en deux variantes typées pour éviter les unions ambiguës
+            const logs = matchedRequestId
+              ? await publicClient.getLogs({
+                  ...(baseFilter as unknown as Record<string, unknown>),
+                  // args filtrés par requestId (indexé)
+                  args: { requestId: matchedRequestId } as Record<string, unknown>,
+                } as unknown as Parameters<typeof publicClient.getLogs>[0])
+              : await publicClient.getLogs(baseFilter as unknown as Parameters<typeof publicClient.getLogs>[0]);
+            if (logs.length > 0) {
+              type CoinFlipResultLog = Log & {
+                args: {
+                  requestId: bigint;
+                  player: string;
+                  didWin: boolean;
+                  randomValue: bigint;
+                };
+              };
+              const didWin = (logs[0] as CoinFlipResultLog).args.didWin;
+              setIsWaitingForVRF(false);
+              setFlipResult({ won: didWin, winAmount: parseFloat(betAmount) * 2 });
+              console.log('[Fallback] VRF Result:', didWin ? 'WON' : 'LOST');
+              unwatch();
+            }
+          } catch (e) {
+            console.error('Fallback getLogs error:', e);
+          }
+        }, 30000); // 30s avant fallback
         
         // Timeout de sécurité après 3 minutes
         setTimeout(() => {
           console.log('Timeout reached, stopping watch');
+          clearTimeout(fallbackTimer);
           unwatch();
           if (isWaitingForVRF) {
             setIsWaitingForVRF(false);
