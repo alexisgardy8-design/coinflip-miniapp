@@ -32,7 +32,7 @@ export default function Home() {
   const [flipResult, setFlipResult] = useState<{ won: boolean; winAmount: number } | null>(null);
   const [isWaitingForVRF, setIsWaitingForVRF] = useState(false);
   
-  const COINFLIP_ADDRESS = "0xc9ec72188b243e26030d04d0ff6ff67efaf93e65" as `0x${string}`;
+  const COINFLIP_ADDRESS = "0x9648aa20862726ad2893445575404f36f3967887" as `0x${string}`;
 
   useEffect(() => {
     if (!isMiniAppReady) {
