@@ -105,7 +105,8 @@ export default function Home() {
               setIsWaitingForVRF(false);
               setFlipResult({
                 won: didWin,
-                winAmount: parseFloat(betAmount) * 2,
+                // 2% fee taken on stake -> payout = 2 * (stake * 0.98) = 1.96x
+                winAmount: parseFloat(betAmount) * 1.96,
               });
               
               console.log('VRF Result:', didWin ? 'WON' : 'LOST');
@@ -153,7 +154,7 @@ export default function Home() {
               };
               const didWin = (logs[0] as CoinFlipResultLog).args.didWin;
               setIsWaitingForVRF(false);
-              setFlipResult({ won: didWin, winAmount: parseFloat(betAmount) * 2 });
+              setFlipResult({ won: didWin, winAmount: parseFloat(betAmount) * 1.96 });
               console.log('[Fallback] VRF Result:', didWin ? 'WON' : 'LOST');
               unwatch();
             }
